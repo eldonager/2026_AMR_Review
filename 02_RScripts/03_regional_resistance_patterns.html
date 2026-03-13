@@ -2077,17 +2077,17 @@ Word.</p>
 ##   z     cells    name              grob
 ## 1 1 (1-1,1-1) arrange    gtable[layout]
 ## 2 2 (1-1,2-2) arrange gtable[guide-box]</code></pre>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">tiff</span>(<span class="st">&quot;figure6.tiff&quot;</span>, <span class="at">width =</span> <span class="dv">5000</span>, <span class="at">height =</span> <span class="dv">4200</span>, <span class="at">res =</span> <span class="dv">300</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">grid.arrange</span>(final_plot, <span class="at">left =</span> yleft, <span class="at">bottom =</span> bottom)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div>
-<pre><code>## quartz_off_screen 
-##                 2</code></pre>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="do">###############################################</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="co"># Legend figure - standalone for separate use</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="do">###############################################</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="fu">tiff</span>(<span class="st">&quot;figure6_legend.tiff&quot;</span>, <span class="at">width =</span> <span class="dv">600</span>, <span class="at">height =</span> <span class="dv">800</span>, <span class="at">res =</span> <span class="dv">300</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="fu">grid.arrange</span>(shared_legend)</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">png</span>(<span class="st">&quot;figure6.png&quot;</span>, <span class="at">width =</span> <span class="dv">5000</span>, <span class="at">height =</span> <span class="dv">4200</span>, <span class="at">res =</span> <span class="dv">300</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co"># tiff(&quot;figure6.tiff&quot;, width = 5000, height = 4200, res = 300)</span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co"># grid.arrange(final_plot, left = yleft, bottom = bottom)</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># dev.off()</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="do">###############################################</span></span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co"># Legend figure - standalone for separate use</span></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="do">###############################################</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="fu">tiff</span>(<span class="st">&quot;figure6_legend.tiff&quot;</span>, <span class="at">width =</span> <span class="dv">600</span>, <span class="at">height =</span> <span class="dv">800</span>, <span class="at">res =</span> <span class="dv">300</span>)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="fu">grid.arrange</span>(shared_legend)</span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div>
 <pre><code>## quartz_off_screen 
 ##                 2</code></pre>
 </div>
