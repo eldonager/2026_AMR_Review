@@ -392,14 +392,11 @@ final_plot <- gridExtra::arrangeGrob(
   nrow   = 1,
   widths = c(20, 3)
 )
-
-tiff("figure6.tiff", width = 5000, height = 4200, res = 300)
-grid.arrange(final_plot, left = yleft, bottom = bottom)
-dev.off()
+png("figure6.png", width = 5000, height = 4200, res = 300)
+# tiff("figure6.tiff", width = 5000, height = 4200, res = 300)
+# grid.arrange(final_plot, left = yleft, bottom = bottom)
+# dev.off()
 
 ###############################################
 # Legend figure - standalone for separate use
 ###############################################
-tiff("figure6_legend.tiff", width = 600, height = 800, res = 300)
-grid.arrange(shared_legend)
-dev.off()

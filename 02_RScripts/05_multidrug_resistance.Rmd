@@ -311,5 +311,9 @@ mdr_comb_plot <- (chick.p | pigs.p)/ (cattle.p | env.p)+
   theme(plot.tag = element_text(face = "bold"))
 mdr_comb_plot 
 
+ggsave("mdr_comb_plot.png", plot = mdr_comb_plot, 
+       width = 9.33, height = 7.67, dpi = 300, units = "in")
+
 ```
+
 
