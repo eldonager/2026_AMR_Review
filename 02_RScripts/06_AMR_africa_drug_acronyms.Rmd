@@ -1,0 +1,63 @@
+---
+title: "06 — Drug Acronyms Table"
+subtitle: "Salmonella AMR in Africa: A Review"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_knit$set(root.dir = "/Users/hitelab/Desktop/2026_AMR_Review/01_Data")
+```
+
+## Overview
+
+This script generates the drug acronyms reference table and exports it to Word (Supplementary Table).
+
+---
+
+```{r drug-acronyms}
+library(tidyverse)
+library(gt)
+#Load data
+library(kableExtra)
+library(tinytex)
+library(AER)
+library(wesanderson)
+library(flextable)
+#Load data
+AMRdf2 <- read.csv("AMR_clean.csv")
+#Join Amphenicols and Fluoroquinolones drugs to one class
+AMRdf2$antibiotic_class[AMRdf2$antibiotic_class == "Amphenicols"] <- "Fluoroquinolones"
+data3 <- AMRdf2 %>%
+  select(antimicrobial,antimicrobial_compound, antibiotic_class,
+         who_classification) %>%
+  unique() %>%
+  arrange(antimicrobial)
+data4 <- with(data3,  data3[order(who_classification) , ])
+my_table <- flextable(data4) %>% 
+  autofit()
+#aligning all colunms to center except antimicrobial
+my_table <- my_table %>% 
+  flextable::align(align = "center", j = c(2:4), part = "all") 
+my_table <-  my_table %>%  
+  fontsize(i = 1, size = 12, part = "header") %>%   # adjust font size of header
+  bold(i = 1, bold = TRUE, part = "header") %>%
+  set_header_labels(         # Rename the columns in original header row
+    antimicrobial = "Antimicrobial", 
+    antimicrobial_compound = "Antimicrobial compound",                  
+    antimicrobial_class = "Antimicrobial class",
+    who_classification = "WHO classification")
+my_table
+save_as_docx(my_table, path = "AMR_Africa.drugacronymstable.docx")
+#write table as a csv file
+#write.csv(data4, "AMR_Africa.drugacronyms.csv", row.names = FALSE)
+```
+
+

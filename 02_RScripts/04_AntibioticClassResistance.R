@@ -663,14 +663,13 @@ cp.species_plot
 
 
 
-# ggsave(filename = "cp.species_plot.tiff",
-#        plot = cp.species_plot,
-#        device = "tiff",
-#        width = 10,
-#        height = 8,
-#        units = "in",
-#        dpi = 700,
-#        compression = "lzw")
+ggsave(filename = "ab_class.species_plot.png",
+       plot = cp.species_plot,
+       device = "png",
+       width = 10,
+       height = 8,
+       units = "in",
+       dpi = 700)
 
 
 

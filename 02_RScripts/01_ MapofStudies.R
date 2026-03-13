@@ -1,5 +1,7 @@
+
+
 ###This scrip is used to plot map of Africa showing the 
-#number of studies included in the analysis (Figure 3b)#######
+#number of studies included in the analysis (Figure 1b)#######
 
 
 ###loading packages
@@ -49,7 +51,7 @@ df1 <- df %>%
 
 world_amr1 <- world %>%
   filter(continent == "Africa") %>%
-  select(country = sovereignt,iso_a3, geometry) #%>%
+  select(country = geounit,iso_a3, geometry) #%>%
  # left_join(df1, by = "country")
 
 ##Adding number of studies to the dataset
@@ -72,19 +74,20 @@ world_amr2 <- world_amr1 %>%
   left_join(data2, by = "country")%>%
   unique()
 
-world_amr2 %>%
-  mapview(zcol = "no_studies",
-          col.regions = viridisLite::plasma) 
+# world_amr2 %>%
+#   mapview(zcol = "no_studies",
+#           col.regions = viridisLite::plasma) 
 
+tmap_mode("plot")
 # plotting the map
-tm_shape(world_amr2) + 
+africa_map<-tm_shape(world_amr2) + 
   tm_polygons(col = "no_studies",  
               title = "number of studies",
-              palette = "RdYlBu") +
-  tm_text("no_studies", size = 0.7) 
-  
+              palette = "okabe") +
+  tm_text("iso_a3", size = 0.7) +
+  tm_layout(legend.position = c("left", "bottom"))
 
-
+tmap_save(africa_map, filename = "africamap.png", dpi = 300)
 
 
 library(tmap)
@@ -103,7 +106,8 @@ map <- map + tm_shape(world_amr2) +
 
 map
 
-
+############################################
+#########################
 
 
 

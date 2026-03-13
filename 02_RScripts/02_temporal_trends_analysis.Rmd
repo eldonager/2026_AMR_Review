@@ -1,0 +1,561 @@
+---
+title: "02 — Temporal Trends Analysis"
+subtitle: "Salmonella AMR in Africa: A review"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 12, fig.height = 9)
+knitr::opts_knit$set(root.dir = "/Users/hitelab/Desktop/2026_AMR_Review/01_Data")
+```
+
+## Overview
+
+This script generates descriptive statistics and temporal trends of AMR data, including Figure 2 (overall temporal trend) and Figure 3 (regional trends).
+
+---
+
+```{r temporal-trends}
+###########
+#This script is used to generate descriptive statistics and temporal trends of AMR data. 
+
+###########
+
+library(ggpubr)
+
+library(boot)
+library(lme4)
+library(boot)
+library(ggthemes)
+library(patchwork)
+library(tidyverse)
+
+
+#code to generate publication quality figures
+theme_Publication <- function(base_size=14, base_family="helvetica") {
+  library(grid)
+  library(ggthemes)
+  (theme_foundation(base_size=base_size, base_family=base_family)
+    + theme(plot.title = element_text(face = "bold",
+                                      size = rel(1.2), hjust = 0.5),
+            text = element_text(),
+            panel.background = element_rect(colour = NA),
+            plot.background = element_rect(colour = NA),
+            panel.border = element_rect(colour = NA),
+            axis.title = element_text(face = "bold",size = rel(1)),
+            axis.title.y = element_text(angle=90,vjust =2),
+            axis.title.x = element_text(vjust = -0.2),
+            axis.text = element_text(), 
+            axis.line = element_line(colour="black"),
+            axis.ticks = element_line(),
+            panel.grid.major = element_line(colour="#f0f0f0"),
+            panel.grid.minor = element_blank(),
+            legend.key = element_rect(colour = NA),
+            legend.position = "bottom",
+            legend.direction = "horizontal",
+            legend.key.size= unit(0.2, "cm"),
+            legend.margin = unit(0, "cm"),
+            legend.title = element_text(face="italic"),
+            plot.margin=unit(c(10,5,5,5),"mm"),
+            strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
+            strip.text = element_text(face="bold")
+    ))
+  
+}
+
+scale_fill_Publication <- function(...){
+  library(scales)
+  discrete_scale("fill","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+  
+}
+
+scale_colour_Publication <- function(...){
+  library(scales)
+  discrete_scale("colour","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+  
+}
+
+
+
+library(tidyverse)
+library(boot)
+library(ggthemes)
+library(patchwork)
+
+
+
+# Load data
+AMR_clean <- read.csv("AMR_clean.csv", stringsAsFactors = FALSE)
+
+# Data wrangling
+AMR_clean <- AMR_clean %>%
+  mutate(no_isolates_susceptible = no_isolate - no_isolates_resistant) %>%
+  select(-no_isolates_intermediate, -sampling_start_year) %>%
+  rename(Year = sampling_end_year) %>%
+  filter(
+    !is.na(Year),
+    !is.na(no_isolates_resistant),
+    !is.na(no_isolates_susceptible),
+    no_isolate > 0
+  )
+
+# Aggregate counts per study-antibiotic unit then compute MeanRes
+data1 <- AMR_clean %>%
+  mutate(doi_id = as.numeric(as.factor(doi))) %>%
+  group_by(doi_id, region, Year, species, species_2,
+           strain, antimicrobial, antibiotic_class, ast_method) %>%
+  summarise(
+    no_isolates_resistant   = sum(no_isolates_resistant,   na.rm = TRUE),
+    no_isolates_susceptible = sum(no_isolates_susceptible, na.rm = TRUE),
+    no_isolate              = sum(no_isolate,              na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    MeanRes          = no_isolates_resistant / no_isolate,
+    Year_f           = factor(Year),
+    region           = factor(region),
+    species          = factor(species),
+    species_2        = factor(species_2),
+    strain           = factor(strain),
+    antimicrobial    = factor(antimicrobial),
+    antibiotic_class = factor(antibiotic_class),
+    ast_method       = factor(ast_method)
+  ) %>%
+  filter(!is.na(MeanRes))
+
+# Aggregate to study-year-region level for trend models and plots
+data2 <- data1 %>%
+  group_by(doi_id, Year, region) %>%
+  summarise(
+    MeanRes                 = mean(MeanRes,                na.rm = TRUE),
+    no_isolates_resistant   = sum(no_isolates_resistant,   na.rm = TRUE),
+    no_isolates_susceptible = sum(no_isolates_susceptible, na.rm = TRUE),
+    no_isolate              = sum(no_isolate,              na.rm = TRUE),
+    .groups = "drop"
+  )
+
+###########################################################################
+# Models fitted on data1 with Year as factor
+# Purpose: identify which covariates drive resistance 
+# quasibinomial for overdispersion; weights = log10(no_isolate+1). Quasibinomial is chosen because 
+#AMR data is overdispersed by nature
+###########################################################################
+
+model1 <- glm(MeanRes ~ Year_f + region + species + antimicrobial + strain + ast_method,
+              family = quasibinomial, weights = log10(no_isolate + 1), data = data1)
+summary(model1)
+
+model2 <- glm(MeanRes ~ Year_f + region + species + antimicrobial + strain,
+              family = quasibinomial, weights = log10(no_isolate + 1), data = data1)
+summary(model2)
+
+model3 <- glm(MeanRes ~ Year_f + region + species + antimicrobial,
+              family = quasibinomial, weights = log10(no_isolate + 1), data = data1)
+summary(model3)
+
+model4 <- glm(MeanRes ~ Year_f + region + species,
+              family = quasibinomial, weights = log10(no_isolate + 1), data = data1)
+summary(model4)
+
+model5 <- glm(MeanRes ~ Year_f + region,
+              family = quasibinomial, weights = log10(no_isolate + 1), data = data1)
+summary(model5)
+
+model6 <- glm(MeanRes ~ Year_f + species,
+              family = quasibinomial, weights = log10(no_isolate + 1), data = data1)
+summary(model6)
+
+model7 <- glm(MeanRes ~ Year_f,
+              family = quasibinomial, weights = log10(no_isolate + 1), data = data1)
+summary(model7)
+
+# QAIC for model selection - lower = better fit
+# QAIC = -2*(logLik/dispersion) + 2K
+dispersion1 <- summary(model1)$dispersion
+QAIC1 <- -2 * (-0.5 * model1$deviance / dispersion1) + 2 * length(coef(model1))
+print(paste("Model 1 QAIC:", round(QAIC1, 2)))
+
+dispersion2 <- summary(model2)$dispersion
+QAIC2 <- -2 * (-0.5 * model2$deviance / dispersion2) + 2 * length(coef(model2))
+print(paste("Model 2 QAIC:", round(QAIC2, 2)))
+
+dispersion3 <- summary(model3)$dispersion
+QAIC3 <- -2 * (-0.5 * model3$deviance / dispersion3) + 2 * length(coef(model3))
+print(paste("Model 3 QAIC:", round(QAIC3, 2)))
+
+dispersion4 <- summary(model4)$dispersion
+QAIC4 <- -2 * (-0.5 * model4$deviance / dispersion4) + 2 * length(coef(model4))
+print(paste("Model 4 QAIC:", round(QAIC4, 2)))
+
+dispersion5 <- summary(model5)$dispersion
+QAIC5 <- -2 * (-0.5 * model5$deviance / dispersion5) + 2 * length(coef(model5))
+print(paste("Model 5 QAIC:", round(QAIC5, 2)))
+
+dispersion6 <- summary(model6)$dispersion
+QAIC6 <- -2 * (-0.5 * model6$deviance / dispersion6) + 2 * length(coef(model6))
+print(paste("Model 6 QAIC:", round(QAIC6, 2)))
+
+dispersion7 <- summary(model7)$dispersion
+QAIC7 <- -2 * (-0.5 * model7$deviance / dispersion7) + 2 * length(coef(model7))
+print(paste("Model 7 QAIC:", round(QAIC7, 2)))
+
+###############################################################
+########################################################
+#Model 1 has the lowest QAIC (2540.5) — it is the best fitting model.
+#This means that all covariates matter: region, species, antimicrobial, strain, and AST method 
+#all contribute meaningfully to explaining resistance variation. 
+####################################################################
+#######################################################################
+##################################
+
+
+# Diagnostic plots for best model 
+par(mfrow = c(2, 2))
+plot(fitted(model1), residuals(model1, type = "pearson"),
+     xlab = "Fitted values", ylab = "Pearson residuals",
+     main = "Residuals vs Fitted", pch = 16, col = "steelblue")
+abline(h = 0, lty = 2, col = "red")
+
+qqnorm(residuals(model1, type = "pearson"), main = "Normal Q-Q",
+       pch = 16, col = "steelblue")
+qqline(residuals(model1, type = "pearson"), col = "red")
+
+plot(fitted(model1), sqrt(abs(residuals(model1, type = "pearson"))),
+     xlab = "Fitted values", ylab = "sqrt(|Pearson residuals|)",
+     main = "Scale-Location", pch = 16, col = "steelblue")
+
+plot(hatvalues(model1), residuals(model1, type = "pearson"),
+     xlab = "Leverage", ylab = "Pearson residuals",
+     main = "Leverage vs Residuals", pch = 16, col = "steelblue")
+abline(h = 0, lty = 2, col = "red")
+par(mfrow = c(1, 1))
+
+
+
+
+########################
+##########################
+# Diagnostic plots for the best-fitting variable selection model (model 1, QAIC = 2540.5).
+# The Residuals vs Fitted plot shows a funnel-shaped pattern with greater spread at 
+# low fitted values narrowing at higher values, which is expected for AMR
+# data where most studies report low resistance.
+# The Normal Q-Q plot shows moderate deviation from the reference line 
+# at both tails, indicating right-skewed residuals; this reflects the skewed distribution
+# of resistance proportions in the dataset where many studies report low resistance 
+# and few report very high resistance. Since quasibinomial regression does not 
+# assume normally distributed residuals this does not invalidate the model. 
+# The Scale-Location plot shows decreasing variance as fitted values increase, 
+# a pattern inherent to outcomes bounded between 0 and 1 that the quasibinomial 
+# variance function partially accommodates. The Leverage vs Residuals plot shows 
+# that the majority of observations have low leverage and cluster near zero residuals, 
+# indicating they do not exert undue influence on model estimates; 
+# a small number of high-residual observations are present but their low leverage
+# means they do not meaningfully distort the fitted coefficients. 
+# Taken together, these diagnostics indicate no major violations of
+# model assumptions and support the validity of model 1 for inference.
+################################################################################
+#################################################################################
+################################
+
+
+
+
+
+###########################################################################
+# PART 2: TEMPORAL TREND
+# Fitted on data2 (study-year-region aggregated) with numeric Year
+# Purpose: test whether AMR prevalence increases or decreases over time
+# Coefficient of Year: positive = increasing, negative = decreasing
+# p-value of Year: significance of trend
+###########################################################################
+
+model <- glm(MeanRes ~ Year,
+             family  = quasibinomial,
+             weights = log10(no_isolate + 1),
+             data    = data2)
+summary(model)
+print(summary(model)$coefficients["Year", ])
+
+###############################
+# coefficient = 0.075, p < 0.001, meaning AMR is significantly increasing over time. 
+# The positive coefficient on Year means that for every one year increase, 
+# mean resistance increases on the log-odds scale by 0.075. 
+#########################################
+##############################################################
+
+
+
+
+new_preds <- predict(model,
+                     newdata = data.frame(Year = seq(min(data2$Year), max(data2$Year), by = 1)),
+                     type = "response", se.fit = TRUE)
+
+pred_df <- data.frame(
+  Year   = seq(min(data2$Year), max(data2$Year), by = 1),
+  fit    = new_preds$fit,
+  se.fit = new_preds$se.fit
+)
+
+fit1 <- predict(model, type = "response", se.fit = TRUE)
+df1  <- as.data.frame(fit1)
+df2  <- cbind(data2, df1)
+
+df3 <- df2 %>%
+  mutate(lower = fit - 1.96 * se.fit,
+         upper = fit + 1.96 * se.fit)
+
+df4 <- aggregate(MeanRes ~ doi_id + Year + region, data = df3, FUN = mean)
+
+# overall temporal trend
+trendplot <- ggplot() +
+  geom_point(data = df4, aes(x = Year, y = MeanRes),
+             shape = 21, color = "black", alpha = 0.4, size = 3) +
+  geom_line(data = pred_df, aes(x = Year, y = fit),
+            color = "blue", linewidth = 1) +
+  geom_ribbon(data = pred_df, aes(x = Year,
+                                  ymin = fit - 1.96 * se.fit,
+                                  ymax = fit + 1.96 * se.fit),
+              fill = "gray70", alpha = 0.3) +
+  geom_boxplot(data = data2, aes(x = Year, y = MeanRes, group = Year),
+               outlier.shape = NA, fill = "skyblue", color = "black", alpha = 0.2) +
+  theme_Publication() +
+  labs(x = "Year", y = "Mean Resistance") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+  scale_x_continuous(breaks = seq(min(df4$Year), max(df4$Year), by = 2)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+trendplot
+
+###########################################################################
+# PART 3: REGIONAL TRENDS
+# MeanRes ~ Year model fitted separately per region on data2
+###########################################################################
+
+# Eastern Africa
+eadata2 <- data2 %>% filter(region == "Eastern Africa")
+
+eamodel <- glm(MeanRes ~ Year,
+               family  = quasibinomial,
+               weights = log10(no_isolate + 1),
+               data    = eadata2)
+summary(eamodel)
+print(summary(eamodel)$coefficients["Year", ])
+
+eanew_preds <- predict(eamodel,
+                       newdata = data.frame(Year = seq(min(eadata2$Year), max(eadata2$Year), by = 1)),
+                       type = "response", se.fit = TRUE)
+
+eapred_df <- data.frame(
+  Year   = seq(min(eadata2$Year), max(eadata2$Year), by = 1),
+  fit    = eanew_preds$fit,
+  se.fit = eanew_preds$se.fit
+)
+
+eafit1 <- predict(eamodel, type = "response", se.fit = TRUE)
+eadf1  <- as.data.frame(eafit1)
+eadf2  <- cbind(eadata2, eadf1)
+eadf3  <- eadf2 %>% mutate(lower = fit - 1.96 * se.fit, upper = fit + 1.96 * se.fit)
+eadf4  <- aggregate(MeanRes ~ doi_id + Year + region, data = eadf3, FUN = mean)
+
+eaplot <- ggplot() +
+  geom_point(data = eadf4, aes(x = Year, y = MeanRes),
+             shape = 21, color = "black", alpha = 0.4, size = 3) +
+  geom_line(data = eapred_df, aes(x = Year, y = fit),
+            color = "blue", linewidth = 1) +
+  geom_ribbon(data = eapred_df, aes(x = Year,
+                                    ymin = fit - 1.96 * se.fit,
+                                    ymax = fit + 1.96 * se.fit),
+              fill = "gray70", alpha = 0.3) +
+  geom_boxplot(data = eadata2, aes(x = Year, y = MeanRes, group = Year),
+               outlier.shape = NA, fill = "skyblue", color = "black", alpha = 0.2) +
+  theme_Publication() +
+  labs(x = "Year", y = "Mean Resistance", subtitle = "East Africa") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+  scale_x_continuous(breaks = seq(min(eadf4$Year), max(eadf4$Year), by = 2)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+eaplot
+
+
+# Northern Africa
+nadata2 <- data2 %>% filter(region == "Northern Africa")
+
+namodel <- glm(MeanRes ~ Year,
+               family  = quasibinomial,
+               weights = log10(no_isolate + 1),
+               data    = nadata2)
+summary(namodel)
+print(summary(namodel)$coefficients["Year", ])
+
+nanew_preds <- predict(namodel,
+                       newdata = data.frame(Year = seq(min(nadata2$Year), max(nadata2$Year), by = 1)),
+                       type = "response", se.fit = TRUE)
+
+napred_df <- data.frame(
+  Year   = seq(min(nadata2$Year), max(nadata2$Year), by = 1),
+  fit    = nanew_preds$fit,
+  se.fit = nanew_preds$se.fit
+)
+
+nafit1 <- predict(namodel, type = "response", se.fit = TRUE)
+nadf1  <- as.data.frame(nafit1)
+nadf2  <- cbind(nadata2, nadf1)
+nadf3  <- nadf2 %>% mutate(lower = fit - 1.96 * se.fit, upper = fit + 1.96 * se.fit)
+nadf4  <- aggregate(MeanRes ~ doi_id + Year + region, data = nadf3, FUN = mean)
+
+naplot <- ggplot() +
+  geom_point(data = nadf4, aes(x = Year, y = MeanRes),
+             shape = 21, color = "black", alpha = 0.4, size = 3) +
+  geom_line(data = napred_df, aes(x = Year, y = fit),
+            color = "blue", linewidth = 1) +
+  geom_ribbon(data = napred_df, aes(x = Year,
+                                    ymin = fit - 1.96 * se.fit,
+                                    ymax = fit + 1.96 * se.fit),
+              fill = "gray70", alpha = 0.3) +
+  geom_boxplot(data = nadata2, aes(x = Year, y = MeanRes, group = Year),
+               outlier.shape = NA, fill = "skyblue", color = "black", alpha = 0.2) +
+  theme_Publication() +
+  labs(x = "Year", y = "Mean Resistance", subtitle = "North Africa") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+  scale_x_continuous(breaks = seq(min(nadf4$Year), max(nadf4$Year), by = 2)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+naplot
+
+
+# West Africa
+wadata2 <- data2 %>% filter(region == "West Africa")
+
+wamodel <- glm(MeanRes ~ Year,
+               family  = quasibinomial,
+               weights = log10(no_isolate + 1),
+               data    = wadata2)
+summary(wamodel)
+print(summary(wamodel)$coefficients["Year", ])
+
+wanew_preds <- predict(wamodel,
+                       newdata = data.frame(Year = seq(min(wadata2$Year), max(wadata2$Year), by = 1)),
+                       type = "response", se.fit = TRUE)
+
+wapred_df <- data.frame(
+  Year   = seq(min(wadata2$Year), max(wadata2$Year), by = 1),
+  fit    = wanew_preds$fit,
+  se.fit = wanew_preds$se.fit
+)
+
+wafit1 <- predict(wamodel, type = "response", se.fit = TRUE)
+wadf1  <- as.data.frame(wafit1)
+wadf2  <- cbind(wadata2, wadf1)
+wadf3  <- wadf2 %>% mutate(lower = fit - 1.96 * se.fit, upper = fit + 1.96 * se.fit)
+wadf4  <- aggregate(MeanRes ~ doi_id + Year + region, data = wadf3, FUN = mean)
+
+waplot <- ggplot() +
+  geom_point(data = wadf4, aes(x = Year, y = MeanRes),
+             shape = 21, color = "black", alpha = 0.4, size = 3) +
+  geom_line(data = wapred_df, aes(x = Year, y = fit),
+            color = "blue", linewidth = 1) +
+  geom_ribbon(data = wapred_df, aes(x = Year,
+                                    ymin = fit - 1.96 * se.fit,
+                                    ymax = fit + 1.96 * se.fit),
+              fill = "gray70", alpha = 0.3) +
+  geom_boxplot(data = wadata2, aes(x = Year, y = MeanRes, group = Year),
+               outlier.shape = NA, fill = "skyblue", color = "black", alpha = 0.2) +
+  theme_Publication() +
+  labs(x = "Year", y = "Mean Resistance", subtitle = "West Africa") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+  scale_x_continuous(breaks = seq(min(wadf4$Year), max(wadf4$Year), by = 2)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+waplot
+
+
+# Southern Africa
+sadata2 <- data2 %>% filter(region == "Southern Africa")
+
+samodel <- glm(MeanRes ~ Year,
+               family  = quasibinomial,
+               weights = log10(no_isolate + 1),
+               data    = sadata2)
+summary(samodel)
+print(summary(samodel)$coefficients["Year", ])
+
+sanew_preds <- predict(samodel,
+                       newdata = data.frame(Year = seq(min(sadata2$Year), max(sadata2$Year), by = 1)),
+                       type = "response", se.fit = TRUE)
+
+sapred_df <- data.frame(
+  Year   = seq(min(sadata2$Year), max(sadata2$Year), by = 1),
+  fit    = sanew_preds$fit,
+  se.fit = sanew_preds$se.fit
+)
+
+safit1 <- predict(samodel, type = "response", se.fit = TRUE)
+sadf1  <- as.data.frame(safit1)
+sadf2  <- cbind(sadata2, sadf1)
+sadf3  <- sadf2 %>% mutate(lower = fit - 1.96 * se.fit, upper = fit + 1.96 * se.fit)
+sadf4  <- aggregate(MeanRes ~ doi_id + Year + region, data = sadf3, FUN = mean)
+
+
+sapred_df <- data.frame(
+  Year   = seq(min(sadata2$Year), max(sadata2$Year), by = 1),
+  fit    = sanew_preds$fit,
+  se.fit = sanew_preds$se.fit
+) %>%
+  mutate(
+    lower = pmax(0, fit - 1.96 * se.fit),
+    upper = pmin(1, fit + 1.96 * se.fit)
+  )
+
+
+head(sapred_df)
+
+
+saplot <- ggplot() +
+  geom_point(data = sadf4, aes(x = Year, y = MeanRes),
+             shape = 21, color = "black", alpha = 0.4, size = 3) +
+  geom_line(data = sapred_df, aes(x = Year, y = fit),
+            color = "blue", linewidth = 1) +
+  geom_ribbon(data = sapred_df, aes(x = Year, ymin = lower, ymax = upper),
+              fill = "gray70", alpha = 0.3) +
+  geom_boxplot(data = sadata2, aes(x = Year, y = MeanRes, group = Year),
+               outlier.shape = NA, fill = "skyblue", color = "black", alpha = 0.2) +
+  theme_Publication() +
+  labs(x = "Year", y = "Mean Resistance", subtitle = "Southern Africa") +
+  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.2)) +
+  scale_x_continuous(breaks = seq(min(sadf4$Year), max(sadf4$Year), by = 2)) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+saplot
+
+figure5 <- (eaplot | naplot) / (waplot | saplot) +
+  plot_annotation(
+    tag_levels = "a",
+    tag_prefix = "(",
+    tag_suffix = ")"
+  ) &
+  theme(plot.tag = element_text(face = "bold", size = 14))
+
+figure5
+
+
+
+# Save figures
+ggsave("trendplot.tiff", plot = trendplot, device = "tiff",
+       width = 10, height = 8, units = "in", dpi = 700, compression = "lzw")
+
+ggsave("figure5_regional_trends.tiff", plot = figure5, device = "tiff",
+       width = 14, height = 12, units = "in", dpi = 700, compression = "lzw")
+
+
+
+```
+
+
