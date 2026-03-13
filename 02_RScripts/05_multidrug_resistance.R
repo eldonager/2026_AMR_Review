@@ -51,7 +51,7 @@ scale_colour_Publication <- function(...) {
 
 
 
-AMR_clean <- read.csv("AMR_clean.csv")
+AMR_clean <- read.csv("/Users/hitelab/Desktop/2026_AMR_Review/01_Data/AMR_clean.csv")
 
 
 
@@ -284,6 +284,8 @@ mdr_comb_plot <- (chick.p | pigs.p)/ (cattle.p | env.p)+
                   tag_suffix = ")")&
   theme(plot.tag = element_text(face = "bold"))
 mdr_comb_plot 
+
+
 # tiff("cp.species_plot.tiff", width=2600, height=2300, res=300)
 #dev.off()
 # plot.comb <- patchwork::patchworkGrob(mdr_comb_plot )
@@ -292,7 +294,8 @@ mdr_comb_plot
 # 
 # f.p
 
-
+ggsave("mdr_comb_plot.png", plot = mdr_comb_plot, 
+       width = 9.33, height = 7.67, dpi = 300, units = "in")
 
 
 
